@@ -16,11 +16,12 @@ Because wind power has zero fuel cost and constitutes a large share of Great Bri
 
 In Great Britain, power delivery is settled on 30-minute intervals (48 Settlement Periods per day, numbered 1 through 48).
 
-### Primary Benchmark: Day D-1 at 11:00 London Time
+### Commercial Market Benchmark: Day D-1 at 11:00 London Local Time
 - **Market Mechanism:** Nord Pool GB Day-Ahead Auction and EPEX SPOT GB Day-Ahead Auction.
 - **Order Book Gate Closure:** **11:00 London local time on Day D-1**.
+- **Important Provenance Note:** Elexon BMRS operates the Balancing Mechanism for outturn settlement, but commercial power procurement gate closures are established by the power exchanges (Nord Pool and EPEX SPOT).
 - **Procurement Horizon:** For all settlement periods of delivery day $D$ (00:00 to 24:00 local time), bids and offers must be submitted prior to 11:00 on day $D-1$.
-- **Rule:** A forecast published at 11:15 or 15:30 on day $D-1$ was **not available** when day-ahead procurement decisions were finalized. Evaluating day-ahead decisions using post-cutoff forecasts introduces **look-ahead leakage**, rendering backtests invalid.
+- **Anti-Leakage Rule:** A forecast published after 11:00 on day $D-1$ was **not available** when day-ahead procurement decisions were finalized. Evaluating day-ahead decisions using post-cutoff forecasts introduces **look-ahead leakage**, rendering backtests invalid.
 
 ### Supported Cutoff Strategies in This Application
 1. `D1_1100` *(Default)*: Day D-1 at 11:00 Europe/London (GB Day-Ahead Auction standard).
@@ -40,8 +41,9 @@ In Great Britain, power delivery is settled on 30-minute intervals (48 Settlemen
 ### 3.2 Granularity Mapping
 - `FUELHH` actuals are recorded at 30-minute resolution (48 settlement periods per day).
 - `WINDFOR` forecasts are produced in 1-hour delivery blocks (24 blocks per day).
-- **Mapping Rule:** Each hourly forecast block (`HH:00:00Z`) covers both half-hours within that hour (`HH:00-HH:30`, Settlement Period $2k-1$, and `HH:30-HH:00`, Settlement Period $2k$).
-- This accurately reflects trading operations: a day-ahead hourly block purchase draws from the hourly forecast valid before gate closure.
+- **Supported Resolution Modes:**
+  1. **Step-wise Hourly Block (`step_block` - Default):** In wholesale trading, power is contracted in hourly block contracts. Each 1-hour forecast block (`HH:00:00Z`) applies across both half-hours within that hour (`HH:00-HH:30`, Settlement Period $2k-1$, and `HH:30-HH:00`, Settlement Period $2k$) as a step-wise expectation. This evaluates all 1,488 settlement intervals across January 2026 (100% coverage).
+  2. **Strict Half-Hourly Exact (`exact`):** Strictly evaluates intervals where `startTime` in WINDFOR exactly matches `startTime` in FUELHH (`:00` timestamps). Half-hours at `:30` are reported unaugmented as `MISSING_FORECAST` (50% coverage, 744 intervals).
 
 ---
 
@@ -75,19 +77,18 @@ Where $N_{\text{total}} = 31 \times 48 = 1,488$ intervals for January 2026.
 
 Under the primary GB Day-Ahead gate closure benchmark (`D1_1100`):
 
-| Metric | Measured Value | Unit | Interpretation |
+| Metric | Step-wise Hourly Block (`step_block`) | Strict Exact Match (`exact`) | Unit |
 | :--- | :--- | :--- | :--- |
-| **Total Intervals** | 1,488 | intervals | Full month of January 2026 (31 days $\times$ 48 SPs) |
-| **Valid Evaluated Intervals** | 1,488 | intervals | 100% data coverage |
-| **Missing Actuals** | 0 | intervals | Complete outturn in FUELHH |
-| **Missing Forecasts** | 0 | intervals | Complete forecast coverage in WINDFOR |
-| **Mean Actual Generation** | 11,580.7 | MW | Average GB wind generation outturn |
-| **Mean Forecast Generation** | 13,421.0 | MW | Average day-ahead expected generation |
-| **Mean Absolute Error (MAE)** | 2,126.1 | MW | Average miss magnitude |
-| **Root Mean Squared Error (RMSE)**| 2,620.8 | MW | Volatility penalty metric |
-| **Forecasting Bias** | **+1,840.3** | MW | **Systematic Overforecasting** |
-| **Total Energy Outturn** | 8,619,520 | MWh | MW $\times$ 0.5h across month |
-| **Total Forecast Energy** | 9,984,850 | MWh | Day-ahead contracted expectation |
+| **Total Intervals** | 1,488 | 1,488 | half-hours |
+| **Evaluated Valid Intervals** | 1,488 (100.0%) | 744 (50.0%) | half-hours |
+| **Missing Forecasts** | 0 | 744 (all `:30` intervals) | half-hours |
+| **Mean Actual Generation** | 11,580.7 | 11,581.1 | MW |
+| **Mean Forecast Generation** | 13,421.0 | 13,421.0 | MW |
+| **Mean Absolute Error (MAE)** | **2,126.1** | **2,107.2** | MW |
+| **Root Mean Squared Error (RMSE)**| **2,620.8** | **2,611.2** | MW |
+| **Forecasting Bias** | **+1,840.3** | **+1,839.9** | MW |
+| **Total Energy Outturn** | 8,619,520 | 4,308,170 | MWh |
+| **Total Forecast Energy** | 9,984,850 | 4,992,620 | MWh |
 
 ### Business Insight
-In January 2026, the national wind forecast systematically overpredicted generation by an average of **+1,840.3 MW** across the month. A utility that mechanically bought power based solely on the day-ahead forecast would have ended up significantly **long**, having to sell excess power into intraday markets often at discounted cashout prices. Incorporating a de-biasing adjustment or dynamic risk buffer would have prevented substantial imbalance penalties.
+In January 2026, the national wind forecast systematically overpredicted generation by an average of **+1,840 MW** across the month regardless of whether evaluated on full half-hourly blocks or strict hourly boundaries. A utility that mechanically bought power based solely on the day-ahead forecast would have ended up significantly **long**, having to sell excess power into intraday markets often at discounted cashout prices. Incorporating a de-biasing adjustment or dynamic risk buffer would have prevented substantial imbalance penalties.
