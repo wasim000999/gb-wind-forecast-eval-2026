@@ -249,7 +249,7 @@ docker compose down
 # Lint with Ruff (must return 'All checks passed!')
 ruff check backend
 
-# Run Pytest suite (14 unit and integration tests)
+# Run Pytest suite (15 unit and integration tests)
 python -m pytest backend/tests -v
 ```
 
