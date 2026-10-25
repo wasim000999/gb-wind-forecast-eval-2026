@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+
 from backend.app.services.data_processor import DataProcessor
 
 
