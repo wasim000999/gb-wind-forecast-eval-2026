@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gb_wind_forecast_eval
+    ports:
+      - "8000:8000"
+    environment:
+      - PROJECT_NAME=GB Wind Generation Forecast Evaluation
+      - ELEXON_BASE_URL=https://data.elexon.co.uk/bmrs/api/v1
+      - DEFAULT_CUTOFF_STRATEGY=D1_1100
+      - ELEXON_TIMEOUT_SECONDS=30.0
+    volumes:
+      # Persist local Elexon cache between container restarts
+      - elexon_cache:/app/backend/app/data/cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  elexon_cache:
+    driver: local
