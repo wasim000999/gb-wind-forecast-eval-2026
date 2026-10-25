@@ -13,42 +13,43 @@ UTC_TZ = UTC
 
 class DataProcessor:
     """
-    Core domain service for temporal alignment and day-ahead forecast selection.
+    Core domain service for temporal alignment, cutoff enforcement, and resolution mapping.
 
     Implements wholesale electricity market decision cutoff rules:
     - Strictly prevents look-ahead leakage.
-    - Evaluates multiple defensible wholesale market gate closure strategies.
+    - Evaluates multiple defensible wholesale market gate closure strategies (EPEX SPOT / Nord Pool).
     - Aligns 30-minute settlement intervals for January 2026.
-    - Accurately bridges Elexon WINDFOR 1-hour block forecasts with FUELHH 30-minute settlement periods.
+    - Transparently handles the resolution difference between Elexon WINDFOR (1-hour forecast blocks)
+      and FUELHH (30-minute settlement outturn).
     """
 
     AVAILABLE_CUTOFF_STRATEGIES = [
         {
             "id": "D1_1100",
-            "name": "Day-Ahead D-1 11:00 London Time (Primary Benchmark)",
+            "name": "Day-Ahead D-1 11:00 London Time (Primary Market Benchmark)",
             "description": "Latest forecast published before 11:00 UK local time on the day prior to delivery.",
-            "marketRationale": "GB Day-Ahead wholesale market standard. Nord Pool GB and EPEX SPOT GB Day-Ahead order books close at 11:00 London time.",
+            "marketRationale": "GB Day-Ahead power auction benchmark. Nord Pool GB and EPEX SPOT GB Day-Ahead auction order books close at 11:00 London local time on Day D-1.",
             "isDefault": True,
         },
         {
             "id": "D1_1200",
-            "name": "Day-Ahead D-1 12:00 London Time (Pan-European Alignment)",
+            "name": "Day-Ahead D-1 12:00 London Time (European Coupling Alignment)",
             "description": "Latest forecast published before 12:00 UK local time on the day prior to delivery.",
-            "marketRationale": "Standard Single Day-Ahead Coupling (SDAC) auction gate closure in continental European markets.",
+            "marketRationale": "Single Day-Ahead Coupling (SDAC) auction gate closure in European coupled markets (EPEX SPOT 12:00 auction).",
             "isDefault": False,
         },
         {
             "id": "D1_1400",
-            "name": "Day-Ahead D-1 14:00 London Time (Post-Auction Schedule)",
+            "name": "Day-Ahead D-1 14:00 London Time (Post-Auction Bilateral)",
             "description": "Latest forecast published before 14:00 UK local time on the day prior to delivery.",
-            "marketRationale": "Used by utilities refining bilateral trading positions post-auction publication.",
+            "marketRationale": "Bilateral post-clearing schedule used by utilities adjusting bilateral contracts post-auction.",
             "isDefault": False,
         },
         {
             "id": "ROLLING_24H",
             "name": "Rolling 24-Hour Horizon",
             "description": "Latest forecast published at least 24 hours prior to the start of each delivery interval.",
-            "marketRationale": "Rolling fixed lead-time benchmark for generation forecasting evaluation.",
+            "marketRationale": "Rolling fixed lead-time benchmark for continuous forecast accuracy assessment.",
             "isDefault": False,
         },
         {
@@ -56,6 +57,23 @@ class DataProcessor:
             "name": "Rolling 12-Hour Horizon",
             "description": "Latest forecast published at least 12 hours prior to the start of each delivery interval.",
             "marketRationale": "Near-term intraday re-balancing benchmark.",
+            "isDefault": False,
+        },
+    ]
+
+    AVAILABLE_MAPPING_MODES = [
+        {
+            "id": "step_block",
+            "name": "Step-wise Hourly Block (Wholesale Trading Standard)",
+            "description": "Each 1-hour WINDFOR forecast applies across both half-hour settlement periods (SP 2k-1 and SP 2k) within that hour as a step-wise constant expectation.",
+            "coverageNote": "100.0% coverage (1,488 half-hour intervals). Matches commercial procurement of hourly contracts.",
+            "isDefault": True,
+        },
+        {
+            "id": "exact",
+            "name": "Strict Half-Hourly Exact Matching",
+            "description": "Only evaluates settlement intervals with an exact timestamp match in WINDFOR (:00). Half-hours at :30 are reported as MISSING_FORECAST without transformation.",
+            "coverageNote": "50.0% coverage (744 half-hour intervals). Strict unaugmented data match.",
             "isDefault": False,
         },
     ]
@@ -120,10 +138,12 @@ class DataProcessor:
         fuelhh_wind_records: list[dict[str, Any]],
         windfor_records: list[dict[str, Any]],
         cutoff_strategy: str = "D1_1100",
+        mapping_mode: str = "step_block",
     ) -> list[IntervalRecord]:
         """
         Match actuals and forecast vintages, apply cutoff rule, and calculate errors.
-        Accounts for Elexon WINDFOR 1-hour forecast blocks mapped to 30-minute settlement periods.
+        - mapping_mode='step_block': 1-hour WINDFOR forecast applies across both half-hours (SP 2k-1, SP 2k).
+        - mapping_mode='exact': Only matches exact timestamp (intervals with :30 are MISSING_FORECAST).
         """
         # 1. Index actuals by normalized startTime
         actuals_by_start: dict[str, dict[str, Any]] = {}
@@ -166,12 +186,16 @@ class DataProcessor:
             if actual_record is not None and "generation" in actual_record:
                 actual_gen = float(actual_record["generation"])
 
-            # Elexon WINDFOR forecasts are published at hourly resolution.
-            # Look first for an exact half-hour match, then fall back to parent hour.
-            parent_hour_str = dt_utc.replace(minute=0, second=0).strftime("%Y-%m-%dT%H:%M:%SZ")
-            available_vintages = vintages_by_start.get(st_str)
-            if not available_vintages:
-                available_vintages = vintages_by_start.get(parent_hour_str, [])
+            # Determine available vintages based on mapping_mode
+            if mapping_mode == "exact":
+                # Strict exact match only: no parent-hour fallback
+                available_vintages = vintages_by_start.get(st_str, [])
+            else:
+                # Step-wise hourly block: check exact first, then parent hour
+                parent_hour_str = dt_utc.replace(minute=0, second=0).strftime("%Y-%m-%dT%H:%M:%SZ")
+                available_vintages = vintages_by_start.get(st_str)
+                if not available_vintages:
+                    available_vintages = vintages_by_start.get(parent_hour_str, [])
 
             # Filter for forecasts published on or before cutoff
             eligible_vintages = []

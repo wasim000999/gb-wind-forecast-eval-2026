@@ -35,6 +35,8 @@ dist/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.tsbuildinfo
+frontend/tsconfig.tsbuildinfo
 
 # Environment and secrets
 .env
@@ -51,6 +53,6 @@ Thumbs.db
 *.swp
 *.swo
 
-# Local cache data (optional if wanting clean repo, or keep pre-seeded fixtures)
-# Keep directory structure:
+# Local cache data
+backend/app/data/cache/*.json
 !backend/app/data/cache/.gitkeep

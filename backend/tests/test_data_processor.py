@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-
 from backend.app.services.data_processor import DataProcessor
 
 
@@ -59,7 +58,6 @@ def test_prevention_of_look_ahead_leakage():
 
     # Under D1_1100 cutoff:
     records = DataProcessor.process_intervals(fuelhh, windfor, cutoff_strategy="D1_1100")
-    # Find the record for 2026-01-02T12:00:00Z
     rec = next(r for r in records if r.startTime == delivery_time)
 
     # Must select 12000.0 (from 09:30:00Z), NOT the look-ahead 9800.0!
@@ -80,6 +78,43 @@ def test_prevention_of_look_ahead_leakage():
     rec_roll12 = next(r for r in records_roll12 if r.startTime == delivery_time)
     assert rec_roll12.forecastGeneration == 9800.0
     assert rec_roll12.forecastPublishTime == "2026-01-01T15:30:00Z"
+
+
+def test_resolution_mapping_modes():
+    """
+    Test difference between step_block (parent hour mapped) and exact (strict :00 only).
+    """
+    t_00 = "2026-01-02T12:00:00Z"
+    t_30 = "2026-01-02T12:30:00Z"
+
+    fuelhh = [
+        {"dataset": "FUELHH", "publishTime": "2026-01-02T12:30:00Z", "startTime": t_00, "settlementDate": "2026-01-02", "settlementPeriod": 25, "fuelType": "WIND", "generation": 10000.0},
+        {"dataset": "FUELHH", "publishTime": "2026-01-02T13:00:00Z", "startTime": t_30, "settlementDate": "2026-01-02", "settlementPeriod": 26, "fuelType": "WIND", "generation": 10500.0},
+    ]
+
+    # WINDFOR only has hourly timestamp for 12:00
+    windfor = [
+        {"dataset": "WINDFOR", "publishTime": "2026-01-01T09:30:00Z", "startTime": t_00, "generation": 11000.0},
+    ]
+
+    # Mode A: step_block -> both :00 and :30 receive the 11000.0 forecast
+    records_block = DataProcessor.process_intervals(fuelhh, windfor, cutoff_strategy="D1_1100", mapping_mode="step_block")
+    r00_b = next(r for r in records_block if r.startTime == t_00)
+    r30_b = next(r for r in records_block if r.startTime == t_30)
+    assert r00_b.forecastGeneration == 11000.0
+    assert r00_b.isValid is True
+    assert r30_b.forecastGeneration == 11000.0
+    assert r30_b.isValid is True
+
+    # Mode B: exact -> only :00 matches; :30 is MISSING_FORECAST
+    records_exact = DataProcessor.process_intervals(fuelhh, windfor, cutoff_strategy="D1_1100", mapping_mode="exact")
+    r00_e = next(r for r in records_exact if r.startTime == t_00)
+    r30_e = next(r for r in records_exact if r.startTime == t_30)
+    assert r00_e.forecastGeneration == 11000.0
+    assert r00_e.isValid is True
+    assert r30_e.forecastGeneration is None
+    assert r30_e.status == "MISSING_FORECAST"
+    assert r30_e.isValid is False
 
 
 def test_vintages_inspection():

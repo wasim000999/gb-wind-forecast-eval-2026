@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class ForecastDataService:
     """
     Central orchestrator for data retrieval, caching, cutoff strategy application,
-    and serving typed analytics responses.
+    resolution mapping, and serving typed analytics responses.
     """
 
     def __init__(self):
@@ -51,7 +51,6 @@ class ForecastDataService:
                 if cached_fuelhh and cached_windfor:
                     self.fuelhh_records = cached_fuelhh
                     self.windfor_records = cached_windfor
-                    # Check if synthetic
                     is_synth = any(r.get("_is_synthetic") for r in cached_fuelhh[:5])
                     if is_synth:
                         self.data_source = "Synthetic Fixture (Demo Mode)"
@@ -61,7 +60,11 @@ class ForecastDataService:
                         self.data_status = "CACHED"
                     self.last_updated = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
                     self._memoized_intervals.clear()
-                    logger.info("Initialized ForecastDataService from cache: %d FUELHH, %d WINDFOR", len(self.fuelhh_records), len(self.windfor_records))
+                    logger.info(
+                        "Initialized ForecastDataService from cache: %d FUELHH, %d WINDFOR",
+                        len(self.fuelhh_records),
+                        len(self.windfor_records),
+                    )
                     return
 
             # 2. Fetch from live Elexon API
@@ -77,10 +80,17 @@ class ForecastDataService:
                     self.cache_manager.save_raw_fuelhh(fuelhh)
                     self.cache_manager.save_raw_windfor(windfor)
                     self._memoized_intervals.clear()
-                    logger.info("Successfully fetched and cached live Elexon data: %d FUELHH, %d WINDFOR", len(fuelhh), len(windfor))
+                    logger.info(
+                        "Successfully fetched and cached live Elexon data: %d FUELHH, %d WINDFOR",
+                        len(fuelhh),
+                        len(windfor),
+                    )
                     return
             except Exception as e:
-                logger.warning("Live Elexon fetch failed or offline: %s. Falling back to synthetic fixtures.", e)
+                logger.warning(
+                    "Live Elexon fetch failed or offline: %s. Falling back to synthetic fixtures.",
+                    e,
+                )
 
             # 3. Fallback to synthetic fixture
             logger.info("Generating deterministic synthetic fixture for January 2026...")
@@ -93,21 +103,29 @@ class ForecastDataService:
             self.cache_manager.save_raw_fuelhh(fuelhh_syn)
             self.cache_manager.save_raw_windfor(windfor_syn)
             self._memoized_intervals.clear()
-            logger.info("Initialized with synthetic fixtures: %d FUELHH, %d WINDFOR", len(fuelhh_syn), len(windfor_syn))
+            logger.info(
+                "Initialized with synthetic fixtures: %d FUELHH, %d WINDFOR",
+                len(fuelhh_syn),
+                len(windfor_syn),
+            )
 
-    def get_processed_intervals(self, cutoff_strategy: str = "D1_1100") -> list[IntervalRecord]:
+    def get_processed_intervals(
+        self, cutoff_strategy: str = "D1_1100", mapping_mode: str = "step_block"
+    ) -> list[IntervalRecord]:
         """
-        Get processed intervals for the chosen cutoff strategy with memoization.
+        Get processed intervals for the chosen cutoff strategy and mapping mode with memoization.
         """
-        if cutoff_strategy not in self._memoized_intervals:
-            logger.info("Processing intervals with cutoff strategy: %s", cutoff_strategy)
+        cache_key = f"{cutoff_strategy}_{mapping_mode}"
+        if cache_key not in self._memoized_intervals:
+            logger.info("Processing intervals: cutoff=%s, mapping=%s", cutoff_strategy, mapping_mode)
             records = DataProcessor.process_intervals(
                 fuelhh_wind_records=self.fuelhh_records,
                 windfor_records=self.windfor_records,
                 cutoff_strategy=cutoff_strategy,
+                mapping_mode=mapping_mode,
             )
-            self._memoized_intervals[cutoff_strategy] = records
-        return self._memoized_intervals[cutoff_strategy]
+            self._memoized_intervals[cache_key] = records
+        return self._memoized_intervals[cache_key]
 
     def filter_intervals_by_date(
         self,
@@ -131,17 +149,17 @@ class ForecastDataService:
     def get_overview(
         self,
         cutoff_strategy: str = "D1_1100",
+        mapping_mode: str = "step_block",
         date_from: str | None = None,
         date_to: str | None = None,
     ) -> OverviewResponse:
-        intervals = self.get_processed_intervals(cutoff_strategy)
+        intervals = self.get_processed_intervals(cutoff_strategy, mapping_mode)
         filtered = self.filter_intervals_by_date(intervals, date_from, date_to)
         metrics = AccuracyAnalytics.calculate_metrics(filtered)
 
         p_start = filtered[0].startTime if filtered else settings.TARGET_START_UTC
         p_end = filtered[-1].startTime if filtered else settings.TARGET_END_UTC
 
-        # Cutoff strategy description
         strat_info = next((s for s in DataProcessor.AVAILABLE_CUTOFF_STRATEGIES if s["id"] == cutoff_strategy), None)
         desc = strat_info["description"] if strat_info else cutoff_strategy
 
@@ -160,10 +178,11 @@ class ForecastDataService:
     def get_timeseries(
         self,
         cutoff_strategy: str = "D1_1100",
+        mapping_mode: str = "step_block",
         date_from: str | None = None,
         date_to: str | None = None,
     ) -> TimeseriesResponse:
-        intervals = self.get_processed_intervals(cutoff_strategy)
+        intervals = self.get_processed_intervals(cutoff_strategy, mapping_mode)
         filtered = self.filter_intervals_by_date(intervals, date_from, date_to)
 
         p_start = filtered[0].startTime if filtered else settings.TARGET_START_UTC
@@ -180,10 +199,11 @@ class ForecastDataService:
     def get_accuracy(
         self,
         cutoff_strategy: str = "D1_1100",
+        mapping_mode: str = "step_block",
         date_from: str | None = None,
         date_to: str | None = None,
     ) -> AccuracyResponse:
-        intervals = self.get_processed_intervals(cutoff_strategy)
+        intervals = self.get_processed_intervals(cutoff_strategy, mapping_mode)
         filtered = self.filter_intervals_by_date(intervals, date_from, date_to)
 
         metrics = AccuracyAnalytics.calculate_metrics(filtered)
@@ -217,6 +237,7 @@ class ForecastDataService:
     def get_paginated_intervals(
         self,
         cutoff_strategy: str = "D1_1100",
+        mapping_mode: str = "step_block",
         page: int = 1,
         page_size: int = 50,
         status: str | None = None,
@@ -225,13 +246,12 @@ class ForecastDataService:
         sort_by: str = "startTime",
         sort_desc: bool = False,
     ) -> PaginatedIntervalsResponse:
-        intervals = self.get_processed_intervals(cutoff_strategy)
+        intervals = self.get_processed_intervals(cutoff_strategy, mapping_mode)
         filtered = self.filter_intervals_by_date(intervals, date_from, date_to)
 
         if status and status != "ALL":
             filtered = [r for r in filtered if r.status == status]
 
-        # Sorting
         def sort_key(rec: IntervalRecord):
             val = getattr(rec, sort_by, None)
             if val is None:
@@ -271,7 +291,7 @@ class ForecastDataService:
             version=settings.VERSION,
             reportingPeriod="January 2026",
             targetMonth="2026-01",
-            timezone="Europe/London (GMT / UTC+0 in January 2026)",
+            timezone="Europe/London (GMT in Jan 2026, UTC+0)",
             dataSource=self.data_source,
             dataStatus=self.data_status,
             elexonDatasets={
@@ -281,12 +301,14 @@ class ForecastDataService:
                     "description": "Half-Hourly Generation Outturn by Fuel Type (National Great Britain wind power outturn)",
                     "url": "https://data.elexon.co.uk/bmrs/api/v1/datasets/FUELHH/stream",
                     "recordsLoaded": len(self.fuelhh_records),
+                    "resolution": "30-minute settlement period (MW average)",
                 },
                 "forecasts": {
                     "dataset": "WINDFOR",
                     "description": "Wind Generation Forecast (GB National wind power forecast vintages)",
                     "url": "https://data.elexon.co.uk/bmrs/api/v1/datasets/WINDFOR/stream",
                     "recordsLoaded": len(self.windfor_records),
+                    "resolution": "1-hour delivery block (MW average)",
                 },
             },
             availableCutoffStrategies=cutoff_options,
@@ -301,5 +323,4 @@ class ForecastDataService:
         )
 
 
-# Global singleton instance
 forecast_service = ForecastDataService()

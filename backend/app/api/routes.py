@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.app.models.schemas import (
@@ -34,11 +33,13 @@ async def get_metadata():
 @router.get("/overview", response_model=OverviewResponse, summary="High-Level Executive Overview")
 async def get_overview(
     cutoff_strategy: str = Query("D1_1100", description="Cutoff strategy ID (e.g. D1_1100, D1_1200, ROLLING_24H)"),
+    mapping_mode: str = Query("step_block", description="Resolution mode: 'step_block' (100% coverage) or 'exact' (50% coverage)"),
     date_from: str | None = Query(None, description="Start date filter (YYYY-MM-DD)"),
     date_to: str | None = Query(None, description="End date filter (YYYY-MM-DD)"),
 ):
     return forecast_service.get_overview(
         cutoff_strategy=cutoff_strategy,
+        mapping_mode=mapping_mode,
         date_from=date_from,
         date_to=date_to,
     )
@@ -47,11 +48,13 @@ async def get_overview(
 @router.get("/timeseries", response_model=TimeseriesResponse, summary="Forecast vs Actual Time Series")
 async def get_timeseries(
     cutoff_strategy: str = Query("D1_1100", description="Cutoff strategy ID"),
+    mapping_mode: str = Query("step_block", description="Resolution mode: 'step_block' or 'exact'"),
     date_from: str | None = Query(None, description="Start date filter (YYYY-MM-DD)"),
     date_to: str | None = Query(None, description="End date filter (YYYY-MM-DD)"),
 ):
     return forecast_service.get_timeseries(
         cutoff_strategy=cutoff_strategy,
+        mapping_mode=mapping_mode,
         date_from=date_from,
         date_to=date_to,
     )
@@ -60,11 +63,13 @@ async def get_timeseries(
 @router.get("/accuracy", response_model=AccuracyResponse, summary="Quantitative Forecast Accuracy Metrics")
 async def get_accuracy(
     cutoff_strategy: str = Query("D1_1100", description="Cutoff strategy ID"),
+    mapping_mode: str = Query("step_block", description="Resolution mode: 'step_block' or 'exact'"),
     date_from: str | None = Query(None, description="Start date filter (YYYY-MM-DD)"),
     date_to: str | None = Query(None, description="End date filter (YYYY-MM-DD)"),
 ):
     return forecast_service.get_accuracy(
         cutoff_strategy=cutoff_strategy,
+        mapping_mode=mapping_mode,
         date_from=date_from,
         date_to=date_to,
     )
@@ -87,6 +92,7 @@ async def get_forecast_vintages(
 @router.get("/intervals", response_model=PaginatedIntervalsResponse, summary="Paginated Interval Data Records")
 async def get_intervals(
     cutoff_strategy: str = Query("D1_1100", description="Cutoff strategy ID"),
+    mapping_mode: str = Query("step_block", description="Resolution mode: 'step_block' or 'exact'"),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(50, ge=1, le=500, description="Items per page"),
     status: str | None = Query(None, description="Status filter: ALL, VALID, MISSING_FORECAST, MISSING_ACTUAL"),
@@ -97,6 +103,7 @@ async def get_intervals(
 ):
     return forecast_service.get_paginated_intervals(
         cutoff_strategy=cutoff_strategy,
+        mapping_mode=mapping_mode,
         page=page,
         page_size=page_size,
         status=status,

@@ -1,5 +1,5 @@
 import React from "react";
-import { Wind, Database, RefreshCw, Clock, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Wind, Database, RefreshCw, Clock, CheckCircle2, AlertTriangle, Sliders } from "lucide-react";
 import { CutoffOption } from "../types";
 
 interface HeaderProps {
@@ -9,6 +9,8 @@ interface HeaderProps {
   cutoffStrategy: string;
   availableCutoffStrategies: CutoffOption[];
   onCutoffChange: (strategyId: string) => void;
+  mappingMode: string;
+  onMappingModeChange: (mode: string) => void;
   onRefresh: () => void;
   isRefreshing: boolean;
 }
@@ -20,6 +22,8 @@ export const Header: React.FC<HeaderProps> = ({
   cutoffStrategy,
   availableCutoffStrategies,
   onCutoffChange,
+  mappingMode,
+  onMappingModeChange,
   onRefresh,
   isRefreshing,
 }) => {
@@ -83,13 +87,13 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Cutoff Strategy Selector */}
             <div className="flex items-center space-x-2">
               <label htmlFor="cutoff-select" className="text-xs text-slate-400 font-medium">
-                Decision Cutoff:
+                Cutoff:
               </label>
               <select
                 id="cutoff-select"
                 value={cutoffStrategy}
                 onChange={(e) => onCutoffChange(e.target.value)}
-                className="bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors"
+                className="bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors"
                 title={currentStrategy?.description || ""}
               >
                 {availableCutoffStrategies.map((strat) => (
@@ -97,6 +101,24 @@ export const Header: React.FC<HeaderProps> = ({
                     {strat.name}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            {/* Resolution Mapping Selector */}
+            <div className="flex items-center space-x-2">
+              <label htmlFor="mapping-select" className="text-xs text-slate-400 font-medium flex items-center gap-1">
+                <Sliders className="h-3 w-3 text-slate-500" />
+                Resolution:
+              </label>
+              <select
+                id="mapping-select"
+                value={mappingMode}
+                onChange={(e) => onMappingModeChange(e.target.value)}
+                className="bg-slate-800 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors"
+                title="Select how 1-hour WINDFOR forecasts map to 30-min settlement intervals"
+              >
+                <option value="step_block">Hourly Block (1,488 SPs, 100%)</option>
+                <option value="exact">Strict Exact Match (744 SPs, 50%)</option>
               </select>
             </div>
 
@@ -115,11 +137,11 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Current Cutoff Rationale Banner */}
         {currentStrategy && (
-          <div className="mt-2 text-[11px] text-slate-400 flex items-center gap-1.5 border-t border-slate-800/60 pt-2">
+          <div className="mt-2 text-[11px] text-slate-400 flex flex-wrap items-center gap-1.5 border-t border-slate-800/60 pt-2">
             <span className="text-slate-300 font-medium">Applied Gate Closure:</span>
             <span>{currentStrategy.description}</span>
             <span className="text-slate-500 hidden sm:inline">•</span>
-            <span className="text-slate-500 hidden sm:inline italic">
+            <span className="text-slate-400 italic">
               {currentStrategy.marketRationale}
             </span>
           </div>

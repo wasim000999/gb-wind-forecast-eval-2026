@@ -30,10 +30,14 @@ export async function fetchMetadata(): Promise<MetadataResponse> {
 
 export async function fetchOverview(
   cutoffStrategy: string = "D1_1100",
+  mappingMode: string = "step_block",
   dateFrom?: string,
   dateTo?: string
 ): Promise<OverviewResponse> {
-  const params = new URLSearchParams({ cutoff_strategy: cutoffStrategy });
+  const params = new URLSearchParams({
+    cutoff_strategy: cutoffStrategy,
+    mapping_mode: mappingMode,
+  });
   if (dateFrom) params.append("date_from", dateFrom);
   if (dateTo) params.append("date_to", dateTo);
 
@@ -44,10 +48,14 @@ export async function fetchOverview(
 
 export async function fetchTimeseries(
   cutoffStrategy: string = "D1_1100",
+  mappingMode: string = "step_block",
   dateFrom?: string,
   dateTo?: string
 ): Promise<TimeseriesResponse> {
-  const params = new URLSearchParams({ cutoff_strategy: cutoffStrategy });
+  const params = new URLSearchParams({
+    cutoff_strategy: cutoffStrategy,
+    mapping_mode: mappingMode,
+  });
   if (dateFrom) params.append("date_from", dateFrom);
   if (dateTo) params.append("date_to", dateTo);
 
@@ -58,10 +66,14 @@ export async function fetchTimeseries(
 
 export async function fetchAccuracy(
   cutoffStrategy: string = "D1_1100",
+  mappingMode: string = "step_block",
   dateFrom?: string,
   dateTo?: string
 ): Promise<AccuracyResponse> {
-  const params = new URLSearchParams({ cutoff_strategy: cutoffStrategy });
+  const params = new URLSearchParams({
+    cutoff_strategy: cutoffStrategy,
+    mapping_mode: mappingMode,
+  });
   if (dateFrom) params.append("date_from", dateFrom);
   if (dateTo) params.append("date_to", dateTo);
 
@@ -86,6 +98,7 @@ export async function fetchVintages(
 
 export async function fetchIntervals(
   cutoffStrategy: string = "D1_1100",
+  mappingMode: string = "step_block",
   page: number = 1,
   pageSize: number = 50,
   status?: string,
@@ -96,6 +109,7 @@ export async function fetchIntervals(
 ): Promise<PaginatedIntervalsResponse> {
   const params = new URLSearchParams({
     cutoff_strategy: cutoffStrategy,
+    mapping_mode: mappingMode,
     page: page.toString(),
     page_size: pageSize.toString(),
     sort_by: sortBy,

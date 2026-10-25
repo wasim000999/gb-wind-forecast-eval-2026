@@ -105,6 +105,7 @@ export interface OverviewResponse {
   lastUpdated: string;
   cutoffStrategy: string;
   cutoffDescription: string;
+  mappingMode?: string;
   metrics: AccuracyMetrics;
 }
 
@@ -112,6 +113,7 @@ export interface TimeseriesResponse {
   periodStart: string;
   periodEnd: string;
   cutoffStrategy: string;
+  mappingMode?: string;
   totalRecords: number;
   intervals: IntervalRecord[];
 }
@@ -132,6 +134,14 @@ export interface CutoffOption {
   isDefault: boolean;
 }
 
+export interface MappingModeOption {
+  id: string;
+  name: string;
+  description: string;
+  coverageNote: string;
+  isDefault: boolean;
+}
+
 export interface MetadataResponse {
   projectName: string;
   version: string;
@@ -147,15 +157,18 @@ export interface MetadataResponse {
       description: string;
       url: string;
       recordsLoaded: number;
+      resolution?: string;
     };
     forecasts: {
       dataset: string;
       description: string;
       url: string;
       recordsLoaded: number;
+      resolution?: string;
     };
   };
   availableCutoffStrategies: CutoffOption[];
+  availableMappingModes?: MappingModeOption[];
   currentCutoffStrategy: string;
   metricDefinitions: Record<string, string>;
 }

@@ -6,6 +6,7 @@ import { formatMW } from "../utils/formatters";
 
 interface IntervalTableProps {
   cutoffStrategy: string;
+  mappingMode?: string;
   dateFrom: string | null;
   dateTo: string | null;
   onSelectInterval: (startTime: string) => void;
@@ -13,6 +14,7 @@ interface IntervalTableProps {
 
 export const IntervalTable: React.FC<IntervalTableProps> = ({
   cutoffStrategy,
+  mappingMode = "step_block",
   dateFrom,
   dateTo,
   onSelectInterval,
@@ -34,6 +36,7 @@ export const IntervalTable: React.FC<IntervalTableProps> = ({
       try {
         const res = await fetchIntervals(
           cutoffStrategy,
+          mappingMode,
           page,
           pageSize,
           statusFilter,
@@ -53,7 +56,7 @@ export const IntervalTable: React.FC<IntervalTableProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [cutoffStrategy, page, pageSize, statusFilter, dateFrom, dateTo, sortBy, sortDesc]);
+  }, [cutoffStrategy, mappingMode, page, pageSize, statusFilter, dateFrom, dateTo, sortBy, sortDesc]);
 
   const handleSort = (field: string) => {
     if (sortBy === field) {
@@ -69,6 +72,7 @@ export const IntervalTable: React.FC<IntervalTableProps> = ({
     try {
       const allRes = await fetchIntervals(
         cutoffStrategy,
+        mappingMode,
         1,
         1500,
         statusFilter,

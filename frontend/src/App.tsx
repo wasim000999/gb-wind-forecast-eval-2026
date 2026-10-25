@@ -44,6 +44,7 @@ export const App: React.FC = () => {
 
   // Filter state
   const [cutoffStrategy, setCutoffStrategy] = useState<string>("D1_1100");
+  const [mappingMode, setMappingMode] = useState<string>("step_block");
   const [dateFrom, setDateFrom] = useState<string | null>(null);
   const [dateTo, setDateTo] = useState<string | null>(null);
   const [selectedIntervalTime, setSelectedIntervalTime] = useState<string | null>(null);
@@ -76,9 +77,9 @@ export const App: React.FC = () => {
     setError(null);
     try {
       const [ovRes, tsRes, accRes] = await Promise.all([
-        fetchOverview(cutoffStrategy, dateFrom || undefined, dateTo || undefined),
-        fetchTimeseries(cutoffStrategy, dateFrom || undefined, dateTo || undefined),
-        fetchAccuracy(cutoffStrategy, dateFrom || undefined, dateTo || undefined),
+        fetchOverview(cutoffStrategy, mappingMode, dateFrom || undefined, dateTo || undefined),
+        fetchTimeseries(cutoffStrategy, mappingMode, dateFrom || undefined, dateTo || undefined),
+        fetchAccuracy(cutoffStrategy, mappingMode, dateFrom || undefined, dateTo || undefined),
       ]);
       setOverview(ovRes);
       setTimeseries(tsRes);
@@ -92,7 +93,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     loadDashboardData();
-  }, [cutoffStrategy, dateFrom, dateTo]);
+  }, [cutoffStrategy, mappingMode, dateFrom, dateTo]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -146,6 +147,8 @@ export const App: React.FC = () => {
         cutoffStrategy={cutoffStrategy}
         availableCutoffStrategies={cutoffOptions}
         onCutoffChange={setCutoffStrategy}
+        mappingMode={mappingMode}
+        onMappingModeChange={setMappingMode}
         onRefresh={handleRefresh}
         isRefreshing={refreshing}
       />
@@ -315,6 +318,7 @@ export const App: React.FC = () => {
             {activeTab === "table" && (
               <IntervalTable
                 cutoffStrategy={cutoffStrategy}
+                mappingMode={mappingMode}
                 dateFrom={dateFrom}
                 dateTo={dateTo}
                 onSelectInterval={handleSelectInterval}
